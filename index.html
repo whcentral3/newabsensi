@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e3a8a">
+<title>Scan Absensi</title>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#0f172a}
+.hide{display:none!important}
+.wrap{max-width:520px;margin:0 auto;padding:12px}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
+label{font-size:13px;color:#475569;display:block;margin:10px 0 4px}
+input{width:100%;padding:13px 14px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;outline:none}
+input:focus{border-color:#2563eb}
+button{border:0;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;background:#2563eb;color:#fff}
+button.sec{background:#e2e8f0;color:#0f172a}
+button.sm{padding:7px 11px;font-size:13px}
+button:disabled{opacity:.6}
+.pw{position:relative}.pw input{padding-right:48px}
+.pw .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;padding:8px;color:#64748b}
+.logo{width:60px;height:60px;border-radius:16px;background:#2563eb;color:#fff;display:grid;place-items:center;font-size:30px;margin:0 auto 10px}
+.err{color:#dc2626;font-size:14px;min-height:18px;margin-top:8px}
+.top{display:flex;align-items:center;gap:8px;color:#fff;padding:4px 2px 10px}
+.top .t{flex:1;line-height:1.2}.top small{opacity:.7}
+.top button{background:rgba(255,255,255,.15);padding:7px 11px;font-size:13px}
+.mode{border-radius:12px;padding:10px 14px;font-weight:700;text-align:center;margin-bottom:10px;color:#fff;background:#d97706}
+.mode.siswa{background:#2563eb}
+.mode small{display:block;font-weight:500;opacity:.9}
+.cambox{position:relative;background:#000;border-radius:14px;overflow:hidden;min-height:240px}
+#vid{display:block;width:100%;height:56vh;max-height:430px;min-height:240px;object-fit:cover;background:#000}
+.reticle{position:absolute;inset:0;margin:auto;width:84%;height:44%;border:3px solid rgba(255,255,255,.9);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.28);pointer-events:none}
+.zoomrow{position:absolute;left:14px;right:14px;bottom:10px;z-index:5;display:flex;align-items:center;gap:8px;color:#fff;font-size:13px}
+.zoomrow input{padding:0;border:0;height:24px}
+.camph{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#cbd5e1;padding:20px}
+.cam-tools{position:absolute;right:8px;top:8px;display:flex;gap:6px;z-index:5}
+.cam-tools button{background:rgba(0,0,0,.55);padding:8px 11px;font-size:16px}
+.res{border-radius:14px;padding:14px;text-align:center;margin:10px 0;color:#fff;background:#475569}
+.res.ok{background:#16a34a}.res.dup{background:#d97706}.res.bad{background:#dc2626}
+.res .n{font-size:22px;font-weight:800}.res .s{opacity:.95;margin-top:2px;font-size:14px}
+.row{display:flex;gap:8px}.row input{flex:1;min-width:0}
+.log{list-style:none;margin:0;padding:0;max-height:200px;overflow:auto}
+.log li{display:flex;gap:8px;padding:7px 2px;border-bottom:1px solid #e2e8f0;font-size:14px}
+.log .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:none}
+.log .c{color:#64748b;font-size:12px}
+h3{margin:0 0 8px;font-size:15px;color:#334155}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="vLogin" class="wrap" style="margin-top:8vh">
+  <div class="card">
+    <div class="logo">📋</div>
+    <h3 style="text-align:center;font-size:18px">Scan Absensi Siswa</h3>
+    <label>Username</label>
+    <input id="lu" autocomplete="username" autocapitalize="none">
+    <label>Password</label>
+    <div class="pw">
+      <input id="lp" type="password" autocomplete="current-password">
+      <button type="button" class="eye" id="eye" aria-label="Tampilkan password">
+        <svg id="eyeIco" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+      </button>
+    </div>
+    <div class="err" id="lerr"></div>
+    <button id="lbtn" style="width:100%;margin-top:6px">Masuk</button>
+  </div>
+</div>
+
+<!-- SCAN -->
+<div id="vMain" class="wrap hide">
+  <div class="top">
+    <div class="t"><b id="hNama"></b><br><small id="hLok">Lokasi belum dipilih</small></div>
+    <button id="btnGanti" class="hide">Ganti lokasi</button>
+    <button id="btnOut">Keluar</button>
+  </div>
+
+  <div id="mode" class="mode">📍 Scan LOKASI dulu<small>Arahkan kamera ke QR/barcode lokasi, atau ketik di bawah</small></div>
+
+  <div class="cambox">
+    <div id="camph" class="camph"><div>
+      <button id="btnCam" style="font-size:17px;padding:14px 22px">📷 Mulai Kamera</button>
+      <div id="camMsg" style="margin-top:12px;font-size:13px"></div>
+    </div></div>
+    <video id="vid" playsinline muted autoplay></video>
+    <div class="reticle hide" id="reticle"></div>
+    <div class="zoomrow hide" id="zoomRow">🔍 <input type="range" id="zoom" min="1" max="1" step="0.1" value="1"></div>
+    <div class="cam-tools hide" id="camTools">
+      <button id="btnSwitch" title="Ganti kamera">🔄</button>
+      <button id="btnTorch" class="hide" title="Senter">🔦</button>
+      <button id="btnStop" title="Matikan kamera">✖</button>
+    </div>
+  </div>
+
+  <div id="res" class="res"><div class="n">Siap</div><div class="s">Nyalakan kamera lalu scan</div></div>
+
+  <div class="card">
+    <div class="row">
+      <input id="inManual" placeholder="Ketik ID / lokasi lalu Enter" autocomplete="off">
+      <button id="btnManual" class="sec">OK</button>
+    </div>
+    <div class="err" id="mErr"></div>
+  </div>
+
+  <div class="card">
+    <h3>Riwayat sesi (<span id="cnt">0</span> tersimpan)</h3>
+    <ul class="log" id="log"></ul>
+  </div>
+</div>
+
+<script>
+/* ====== GANTI DENGAN URL WEB APP APPS SCRIPT ANDA (berakhiran /exec) ====== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbyXzD20daFWoMr0CoBesfZsqES3RWvVY4mVC1xGiL_GEqiY-opwEKEp3u44p1AY5-V4oQ/exec';
+/* ======================================================================== */
+
+const $ = id => document.getElementById(id);
+const S = { token: localStorage.getItem('abs_tk'), lokasi: null, mode: 'lokasi', n: 0, done: {} };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+
+/* panggilan API (text/plain agar tidak kena preflight CORS) */
+async function api(action, data) {
+  const r = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action: action, token: S.token }, data || {}))
+  });
+  const j = await r.json();
+  if (j && j.session) { logout(false); $('lerr').textContent = j.msg; throw new Error('SESSION'); }
+  return j;
+}
+
+/* bunyi & getar */
+let ac;
+function beep(ok) {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.value = ok ? 880 : 220; g.gain.value = .15;
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + (ok ? .12 : .4));
+  } catch (e) {}
+  try { navigator.vibrate && navigator.vibrate(ok ? 60 : [120, 60, 120]); } catch (e) {}
+}
+
+/* ikon mata */
+const EYE = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+const EYE_OFF = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+$('eyeIco').innerHTML = EYE;
+$('eye').onclick = () => {
+  const show = $('lp').type === 'password';
+  $('lp').type = show ? 'text' : 'password';
+  $('eyeIco').innerHTML = show ? EYE_OFF : EYE;
+};
+
+/* ===== LOGIN ===== */
+async function doLogin() {
+  $('lerr').textContent = ''; $('lbtn').disabled = true; $('lbtn').textContent = 'Memeriksa...';
+  try {
+    S.token = null;
+    const r = await api('login', { username: $('lu').value, password: $('lp').value });
+    if (!r.ok) $('lerr').textContent = r.msg;
+    else { S.token = r.token; localStorage.setItem('abs_tk', r.token); enter(r.nama); }
+  } catch (e) { if (e.message !== 'SESSION') $('lerr').textContent = 'Gagal terhubung. Cek URL API & akses deployment "Anyone".'; }
+  $('lbtn').disabled = false; $('lbtn').textContent = 'Masuk';
+}
+$('lbtn').onclick = doLogin;
+$('lp').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+$('lu').onkeydown = e => { if (e.key === 'Enter') $('lp').focus(); };
+
+function enter(nama) {
+  $('vLogin').classList.add('hide'); $('vMain').classList.remove('hide');
+  $('hNama').textContent = nama; $('lp').value = '';
+  setMode('lokasi'); $('inManual').focus();
+}
+function logout(call) {
+  stopCam();
+  if (call && S.token) api('logout').catch(() => {});
+  localStorage.removeItem('abs_tk'); S.token = null; S.lokasi = null; S.n = 0; S.done = {};
+  $('log').innerHTML = ''; $('cnt').textContent = 0;
+  $('vMain').classList.add('hide'); $('vLogin').classList.remove('hide');
+}
+$('btnOut').onclick = () => logout(true);
+
+/* ===== MODE ===== */
+function setMode(m) {
+  S.mode = m;
+  const el = $('mode');
+  if (m === 'lokasi') {
+    el.className = 'mode';
+    el.innerHTML = '📍 Scan LOKASI dulu<small>Arahkan kamera ke QR/barcode lokasi, atau ketik di bawah</small>';
+    $('inManual').placeholder = 'Ketik ID / nama lokasi lalu Enter';
+    $('hLok').textContent = 'Lokasi belum dipilih'; $('btnGanti').classList.add('hide');
+  } else {
+    el.className = 'mode siswa';
+    el.innerHTML = '🎓 Scan ID SISWA<small>Lokasi: ' + esc(S.lokasi.nama) + ' — tiap scan langsung tersimpan</small>';
+    $('inManual').placeholder = 'Ketik ID siswa lalu Enter';
+    $('hLok').textContent = '📍 ' + S.lokasi.nama; $('btnGanti').classList.remove('hide');
+  }
+}
+$('btnGanti').onclick = () => { S.lokasi = null; setMode('lokasi'); show('', 'Pilih lokasi baru', 'Scan / ketik lokasi'); };
+
+/* ===== KAMERA LANGSUNG: pipeline sendiri =====
+   - Resolusi tinggi (1080p), fokus kontinu, zoom, senter, ganti kamera
+   - Decoder: BarcodeDetector native (Chrome/Android) -> fallback ZXing (iOS/lainnya)
+   - Seluruh frame dipindai (tidak dipotong), ~9x per detik */
+const vid = $('vid');
+let stream = null, running = false, detector = null, zx = null, wake = null, torchOn = false;
+let last = '', lastT = 0;
+const cv = document.createElement('canvas');
+const cx = cv.getContext('2d', { willReadFrequently: true });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function initDecoder() {
+  if (detector || zx) return;
+  if ('BarcodeDetector' in window) {
+    try {
+      const want = ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'itf', 'upc_a'];
+      const sup = await BarcodeDetector.getSupportedFormats();
+      const fm = want.filter(f => sup.includes(f));
+      if (fm.length) { detector = new BarcodeDetector({ formats: fm }); return; }
+    } catch (e) {}
+  }
+  if (typeof ZXing === 'undefined') throw new Error('ZXING_MISSING');
+  const B = ZXing.BarcodeFormat, H = new Map();
+  H.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [B.QR_CODE, B.CODE_128, B.CODE_39, B.EAN_13, B.EAN_8, B.ITF, B.UPC_A]);
+  zx = new ZXing.MultiFormatReader();
+  zx.setHints(H);
+}
+
+async function decodeFrame() {
+  if (detector) {
+    try { const r = await detector.detect(vid); return r.length ? r[0].rawValue : null; }
+    catch (e) { detector = null; await initDecoder(); return null; } // native gagal -> pakai ZXing
+  }
+  const w = vid.videoWidth, h = vid.videoHeight;
+  if (!w || !zx) return null;
+  const sc = Math.min(1, 1280 / w);
+  cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
+  cx.drawImage(vid, 0, 0, cv.width, cv.height);
+  try {
+    const src = new ZXing.HTMLCanvasElementLuminanceSource(cv);
+    return zx.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src))).getText();
+  } catch (e) { return null; } // NotFound = tidak ada kode di frame ini
+}
+
+async function loop() {
+  while (running) {
+    const t0 = performance.now();
+    if (vid.readyState >= 2) {
+      try { const r = await decodeFrame(); if (r) onDecode(r); } catch (e) {}
+    }
+    await sleep(Math.max(25, 110 - (performance.now() - t0)));
+  }
+}
+
+function stopStream() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  vid.srcObject = null;
+}
+async function openStream(allowPref = true) {
+  stopStream();
+  const saved = localStorage.getItem('abs_cam');
+  const video = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
+  if (saved) video.deviceId = { exact: saved }; else video.facingMode = { ideal: 'environment' };
+  try { stream = await navigator.mediaDevices.getUserMedia({ video, audio: false }); }
+  catch (e) { if (saved) { localStorage.removeItem('abs_cam'); return openStream(false); } throw e; }
+  vid.srcObject = stream; await vid.play();
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+  const trk = stream.getVideoTracks()[0];
+  // Banyak HP memilih kamera ultra-wide (fokus dekat buruk). Pilih kamera belakang utama.
+  if (allowPref && !saved && devs.length > 1) {
+    const cur = trk.getSettings().deviceId;
+    const pref = devs.find(d => /back|rear|belakang|environment/i.test(d.label) && !/ultra|wide|tele|depth/i.test(d.label));
+    if (pref && pref.deviceId !== cur) { localStorage.setItem('abs_cam', pref.deviceId); return openStream(false); }
+  }
+  $('btnSwitch').classList.toggle('hide', devs.length < 2);
+  await tuneTrack(trk);
+}
+async function tuneTrack(trk) {
+  const cap = trk.getCapabilities ? trk.getCapabilities() : {};
+  try {
+    if (cap.focusMode && cap.focusMode.includes('continuous'))
+      await trk.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+  } catch (e) {}
+  $('btnTorch').classList.toggle('hide', !cap.torch);
+  const z = $('zoom');
+  if (cap.zoom) {
+    z.min = cap.zoom.min; z.max = cap.zoom.max; z.step = cap.zoom.step || 0.1; z.value = cap.zoom.min;
+    z.oninput = () => trk.applyConstraints({ advanced: [{ zoom: +z.value }] }).catch(() => {});
+    $('zoomRow').classList.remove('hide');
+  } else $('zoomRow').classList.add('hide');
+}
+
+async function startCam() {
+  $('camMsg').textContent = 'Menyalakan kamera...';
+  try {
+    await initDecoder();
+    await openStream();
+    $('camph').classList.add('hide'); $('camTools').classList.remove('hide'); $('reticle').classList.remove('hide');
+    running = true; loop();
+    try { wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  } catch (e) {
+    stopStream(); running = false;
+    const n = e && e.name || e.message || String(e);
+    $('camMsg').innerHTML = n === 'NotAllowedError' ? 'Izin kamera ditolak. Aktifkan izin kamera untuk situs ini di pengaturan browser, lalu coba lagi.'
+      : n === 'ZXING_MISSING' ? 'Library pembaca kode gagal dimuat. Cek internet lalu muat ulang.'
+      : n === 'NotReadableError' ? 'Kamera sedang dipakai aplikasi lain. Tutup aplikasi kamera/tab lain lalu coba lagi.'
+      : 'Kamera tidak bisa dibuka (' + esc(n) + '). Pastikan dibuka lewat HTTPS.';
+  }
+}
+async function stopCam() {
+  running = false; torchOn = false;
+  stopStream();
+  try { wake && wake.release(); } catch (e) {} wake = null;
+  $('camph').classList.remove('hide'); $('camTools').classList.add('hide');
+  $('reticle').classList.add('hide'); $('zoomRow').classList.add('hide'); $('camMsg').textContent = '';
+}
+$('btnCam').onclick = startCam;
+$('btnStop').onclick = stopCam;
+$('btnTorch').onclick = async () => {
+  if (!stream) return;
+  try { torchOn = !torchOn; await stream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: torchOn }] }); }
+  catch (e) { torchOn = false; }
+};
+$('btnSwitch').onclick = async () => {
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+  if (devs.length < 2) return;
+  const cur = stream && stream.getVideoTracks()[0].getSettings().deviceId;
+  const i = devs.findIndex(d => d.deviceId === cur);
+  localStorage.setItem('abs_cam', devs[(i + 1) % devs.length].deviceId);
+  try { await openStream(false); } catch (e) {}
+};
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden || !running) return;
+  try { wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  const t = stream && stream.getVideoTracks()[0];
+  if (!t || t.readyState !== 'live') { try { await openStream(false); } catch (e) {} }
+});
+
+function onDecode(text) {
+  const t = Date.now();
+  if (text === last && t - lastT < 3000) return; // abaikan kode sama yang terbaca berulang
+  last = text; lastT = t;
+  route(text);
+}
+function route(v) {
+  v = String(v || '').trim(); if (!v) return;
+  S.mode === 'lokasi' ? setLokasi(v) : handleScan(v);
+}
+
+/* ===== LOKASI ===== */
+async function setLokasi(v) {
+  $('mErr').textContent = '';
+  show('', 'Memeriksa lokasi...', esc(v));
+  try {
+    const r = await api('cekLokasi', { input: v });
+    if (!r.ok) { beep(false); show('bad', 'Lokasi tidak valid', r.msg); return; }
+    S.lokasi = r; beep(true); setMode('siswa');
+    show('ok', r.nama, 'Lokasi dipilih — sekarang scan ID siswa');
+  } catch (e) { if (e.message !== 'SESSION') show('bad', 'Gagal terhubung', 'Periksa koneksi internet'); }
+}
+
+/* ===== SCAN SISWA ===== */
+const COL = { OK: '#16a34a', DUP: '#d97706', NOTFOUND: '#dc2626', ERR: '#dc2626' };
+async function handleScan(id) {
+  const key = today() + '|' + S.lokasi.id + '|' + id;
+  if (S.done[key]) { beep(false); show('dup', S.done[key], 'Sudah discan di sesi ini'); return; }
+  show('', 'Menyimpan...', esc(id));
+  let r;
+  try { r = await api('scan', { id: id, lokasi: S.lokasi.id }); }
+  catch (e) { if (e.message === 'SESSION') return; r = { status: 'ERR', msg: 'Gagal terhubung — scan ulang' }; }
+  const ok = r.status === 'OK';
+  beep(ok);
+  if (r.status === 'OK' || r.status === 'DUP') S.done[key] = r.nama;
+  if (r.nama) show(ok ? 'ok' : 'dup', r.nama, 'Kelas ' + esc(r.kelas) + ' • ' + (ok ? '✔ Tersimpan ' + esc(r.jam) : '⚠ ' + esc(r.msg)));
+  else show('bad', '✖ ' + (r.status === 'NOTFOUND' ? 'ID tidak terdaftar' : 'Gagal'), esc(r.msg));
+  if (ok) $('cnt').textContent = ++S.n;
+  const li = document.createElement('li');
+  li.innerHTML = '<span class="dot" style="background:' + COL[r.status] + '"></span><div><b>' + esc(r.nama || id) + '</b> ' +
+    esc(r.kelas || '') + '<div class="c">' + esc(ok ? r.jam : r.msg) + '</div></div>';
+  $('log').prepend(li);
+}
+function show(cls, n, s) { $('res').className = 'res ' + cls; $('res').innerHTML = '<div class="n">' + esc(n) + '</div><div class="s">' + (s || '') + '</div>'; }
+
+/* input manual / scanner keyboard */
+function manual() { const v = $('inManual').value; $('inManual').value = ''; route(v); }
+$('btnManual').onclick = manual;
+$('inManual').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); manual(); } };
+
+/* auto-login */
+(async () => {
+  if (!S.token || API_URL.startsWith('PASTE')) return;
+  try { const r = await api('me'); r.ok ? enter(r.nama) : logout(false); } catch (e) {}
+})();
+if (API_URL.startsWith('PASTE')) $('lerr').textContent = 'API_URL belum diisi di scan.html';
+</script>
+</body>
+</html>
